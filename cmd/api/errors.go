@@ -6,7 +6,7 @@ import (
 )
 
 func (app *application) logError(r *http.Request, err error) {
-	// Use the PrintError() method to log the error message, and include the current
+	// the PrintError() method to log the error message, and include the current
 	// request method and URL as properties in the log entry.
 	app.logger.PrintError(err, map[string]string{
 		"request_method": r.Method,
@@ -15,15 +15,10 @@ func (app *application) logError(r *http.Request, err error) {
 }
 
 // The errorResponse() method is a generic helper for sending JSON-formatted error
-// messages to the client with a given status code. Note that we're using an any
-// type for the message parameter, rather than just a string type, as this gives us
-// more flexibility over the values that we can include in the response.
+// messages to the client with a given status code.
 func (app *application) errorResponse(w http.ResponseWriter, r *http.Request, status int, message any) {
 	env := envelope{"error": message}
 
-	// Write the response using the writeJSON() helper. If this happens to return an
-	// error then log it, and fall back to sending the client an empty response with a
-	// 500 Internal Server Error status code.
 	err := app.writeJSON(w, status, env, nil)
 	if err != nil {
 		app.logError(r, err)
@@ -31,10 +26,6 @@ func (app *application) errorResponse(w http.ResponseWriter, r *http.Request, st
 	}
 }
 
-// The serverErrorResponse() method will be used when our application encounters an
-// unexpected problem at runtime. It logs the detailed error message, then uses the
-// errorResponse() helper to send a 500 Internal Server Error status code and JSON
-// response (containing a generic error message) to the client.
 func (app *application) serverErrorResponse(w http.ResponseWriter, r *http.Request, err error) {
 	app.logError(r, err)
 
@@ -84,4 +75,19 @@ func (app *application) invalidAuthenticationTokenResponse(w http.ResponseWriter
 
 	message := "invalid or missing authentication token"
 	app.errorResponse(w, r, http.StatusUnauthorized, message)
+}
+
+func (app *application) authenticationRequiredResponse(w http.ResponseWriter, r *http.Request) {
+	message := "you must be authenticated to access this resource"
+	app.errorResponse(w, r, 401, message)
+}
+
+func (app *application) inactiveAccountResponse(w http.ResponseWriter, r *http.Request) {
+	message := "your user account must be activated to access this resource"
+	app.errorResponse(w, r, 403, message)
+}
+
+func (app *application) notPermittedResponse(w http.ResponseWriter, r *http.Request) {
+	message := "your user account doesn't have the necessary permissions to access this resource"
+	app.errorResponse(w, r, http.StatusForbidden, message)
 }

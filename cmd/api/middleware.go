@@ -16,22 +16,12 @@ import (
 
 func (app *application) recoverPanic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Create a deferred function (which will always be run in the event of a panic
-		// as Go unwinds the stack).
 		defer func() {
-			// Use the builtin recover function to check if there has been a panic or
-			// not.
+
 			if err := recover(); err != nil {
-				// If there was a panic, set a "Connection: close" header on the
-				// response. This acts as a trigger to make Go's HTTP server
-				// automatically close the current connection after a response has been
-				// sent.
+
 				w.Header().Set("Connection", "close")
-				// The value returned by recover() has the type any, so we use
-				// fmt.Errorf() to normalize it into an error and call our
-				// serverErrorResponse() helper. In turn, this will log the error using
-				// our custom Logger type at the ERROR level and send the client a 500
-				// Internal Server Error response.
+
 				app.serverErrorResponse(w, r, fmt.Errorf("%s", err))
 			}
 		}()
@@ -40,7 +30,7 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 	})
 }
 func (app *application) rateLimit(next http.Handler) http.Handler {
-	// Define a client struct to hold the rate limiter and last seen time for each
+	// client struct to hold the rate limiter and last seen time for each
 	// client.
 	type client struct {
 		limiter  *rate.Limiter
@@ -52,7 +42,7 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 		clients = make(map[string]*client)
 	)
 
-	// Launch a background goroutine which removes old entries from the clients map once
+	// a background goroutine which removes old entries from the clients map once
 	// every minute.
 	go func() {
 		for {
@@ -148,4 +138,51 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+
+		if user.IsAnonymous() {
+			app.authenticationRequiredResponse(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *application) requireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+
+		if !user.Activated {
+			app.inactiveAccountResponse(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+
+	return app.requireAuthenticatedUser(fn)
+}
+
+func (app *application) requirePermission(code string, next http.HandlerFunc) http.HandlerFunc {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+
+		permissions, err := app.models.Permissions.GetAllForUser(user.ID)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+		if !permissions.Include(code) {
+			app.notPermittedResponse(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
+	return app.requireActivatedUser(fn)
 }

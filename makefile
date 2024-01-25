@@ -1,2 +1,2 @@
 start:
-   go run ./cmd/api/
+   go run ./cmd/api
