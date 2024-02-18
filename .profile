@@ -1,1 +1,1 @@
-export GREENLIGHT_DB_DSN='postgres://greenlight:pa55word@localhost/greenlight?sslmode=disable'
+export GREENLIGHT_DB_DSN='postgres://postgres:triblecoder@localhost/greenlight?sslmode=disable'

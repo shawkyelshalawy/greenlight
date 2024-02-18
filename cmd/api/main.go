@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"expvar"
 	"flag"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -65,7 +67,7 @@ func main() {
 
 	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
-	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
+	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", false, "Enable rate limiter")
 	flag.StringVar(&cfg.smtp.host, "smtp-host", "smtp.mailtrap.io", "SMTP host")
 	flag.IntVar(&cfg.smtp.port, "smtp-port", 2525, "SMTP port")
 	flag.StringVar(&cfg.smtp.username, "smtp-username", "764e6b3e8e7da6", "SMTP username")
@@ -87,7 +89,21 @@ func main() {
 	defer db.Close()
 
 	logger.PrintInfo("database connection pool established", nil)
+	expvar.NewString("version").Set(version)
+	// Publish the number of active goroutines.
+	expvar.Publish("goroutines", expvar.Func(func() any {
+		return runtime.NumGoroutine()
+	}))
 
+	// Publish the database connection pool statistics.
+	expvar.Publish("database", expvar.Func(func() any {
+		return db.Stats()
+	}))
+
+	// Publish the current Unix timestamp.
+	expvar.Publish("timestamp", expvar.Func(func() any {
+		return time.Now().Unix()
+	}))
 	app := &application{
 		config: cfg,
 		logger: logger,
