@@ -1,1 +1,0 @@
-export GREENLIGHT_DB_DSN='postgres://postgres:triblecoder@localhost/greenlight?sslmode=disable'
