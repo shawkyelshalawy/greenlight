@@ -176,10 +176,6 @@ func (m UserModel) GetForToken(tokenScope, tokenPlaintext string) (*User, error)
 			AND tokens.scope = $2 
 			AND tokens.expiry > $3`
 
-	// Create a slice containing the query arguments. Notice how we use the [:] operator
-	// to get a slice containing the token hash, rather than passing in the array (which
-	// is not supported by the pq driver), and that we pass the current time as the
-	// value to check against the token expiry.
 	args := []any{tokenHash[:], tokenScope, time.Now()}
 
 	var user User
@@ -187,8 +183,6 @@ func (m UserModel) GetForToken(tokenScope, tokenPlaintext string) (*User, error)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	// Execute the query, scanning the return values into a User struct. If no matching
-	// record is found we return an ErrRecordNotFound error.
 	err := m.DB.QueryRowContext(ctx, query, args...).Scan(
 		&user.ID,
 		&user.CreatedAt,
